@@ -10,7 +10,7 @@ all: build test
 build: $(SL_HEADER) $(SRCS) $(TEST_OUT)
 
 .PHONY: test
-test:
+test: $(TEST_OUT)
 	./$(TEST_OUT)
 
 
@@ -22,6 +22,8 @@ doc:
 
 $(TEST_OUT): $(OBJS)
 	$(CC) $(LDFLAGS) $(OBJS) -o $@
+
+$(OBJS): $(SL_HEADER)
 
 .c.o:
 	$(CC) $(CFLAGS) -c $< -o $@
