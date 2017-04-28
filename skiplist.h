@@ -1,7 +1,31 @@
-/* Where possible, this software has been disclaimed from any copyright
-   and is placed in the public domain. Where that dedication is not
-   recognized, you are granted a perpetual, irrevocable license to copy
-   and modify this file in any way you see fit. */
+/* vi: set expandttab softtabstop=4 tabstop=4 shiftwidth=4 */
+
+/**
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * For more information, please refer to <http://unlicense.org/>
+ */
 
 /**
  * 1. Create a guarded header that defines SKIPLIST_KEY and SKIPLIST_VALUE
@@ -12,13 +36,17 @@
  *    define different SKIPLIST_NAMESPACE values and define SKIPLIST_IMPLEMENTATION
  *    once for each key/value type pair.
  * 4. Other options:
- *      - SKIPLIST_MAX_LEVELS - 33 by default
- *      - SKIPLIST_MALLOC & SKIPLIST_FREE - wrappers for stdlib malloc/free by default
- *        Both are passed a void * data pointer (for memory pool, gc context, etc).
- *      - SKIPLIST_STATIC - if defined, declare all public functions static
- *        (make skiplist local to the file it's included from).
- *      - SKIPLIST_EXTERN - 'extern' by default; define to change calling convention
- *        or linkage etc.
+ *     - SKIPLIST_MAX_LEVELS - 33 by default.
+ *     - SKIPLIST_MALLOC & SKIPLIST_FREE - wrappers for stdlib malloc/free by default.
+ *     Both are passed a void \* data pointer (for memory pool, gc context, etc).
+ *     - SKIPLIST_HEIGHT - a macro function taking `(SKIPLIST_KEY)` which should
+ *     produce an unsigned int 0 <= height < SKIPLIST_MAX_LEVELS. By default this
+ *     is implemented using `arc4random_uniform` in the C standard library, but you
+ *     might want to replace it with a key-dependent function.
+ *     - SKIPLIST_STATIC - if defined, declare all public functions static
+ *     (make skiplist local to the file it's included from).
+ *     - SKIPLIST_EXTERN - 'extern' by default; define to change calling convention
+ *     or linkage etc.
  *
  * Example:
  *
@@ -36,6 +64,7 @@
  *
  *     // program.c
  *     // short test drive program
+ *     #include <assert.h>
  *     #include <stdio.h>
  *     #include <string.h>
  *     #define SKIPLIST_IMPLEMENTATION
@@ -53,11 +82,7 @@
  *     int main(int argc, const char **argv) {
  *         sl_strint_skiplist list;
  *         int err = sl_strint_init(&list, cmp, NULL);
- *         // Not real error handling
- *         if (err) {
- *             puts("Uh oh");
- *             exit(err);
- *         }
+ *         assert(err == 0);
  *
  *         sl_strint_insert(&list, "a", 1, NULL);
  *         sl_strint_insert(&list, "c", 3, NULL);
@@ -171,7 +196,7 @@ SKIPLIST_EXTERN
 int SKIPLIST_NAME(init)(SL_LIST *list, SL_CMP_FN cmp, void *cmp_udata, void *mem_udata);
 
 /* Free memory used by a skiplist.
- * @list Free this guy from his bondage to memory.
+ * @list a pointer to the skiplist to be freed
  */
 SKIPLIST_EXTERN
 void SKIPLIST_NAME(free)(SL_LIST *list);
@@ -240,7 +265,7 @@ short SKIPLIST_NAME(remove)(SL_LIST *list, SL_KEY key, SL_VAL *out);
 SKIPLIST_EXTERN
 int SKIPLIST_NAME(iter)(SL_LIST *list, SL_ITER_FN iter, void *userdata);
 
-/* Does what it says on the tin.
+/* Returns the number of items in the skiplist
  * @list An initialized skiplist
  *
  * @return The number of key/value pairs in the skiplist
@@ -294,6 +319,9 @@ short SKIPLIST_NAME(shift)(SL_LIST *list, SL_KEY *key_out, SL_VAL *val_out);
 
 #ifdef SKIPLIST_IMPLEMENTATION
 
+#define CMP_EQ(list, a, b) (list->cmp(a, b, list->cmp_udata) == 0)
+#define CMP_LT(list, a, b) (list->cmp(a, b, list->cmp_udata) < 0)
+
 SKIPLIST_EXTERN
 int SKIPLIST_NAME(init)(SL_LIST *list, SL_CMP_FN cmp, void *cmp_udata, void *mem_udata) {
     list->cmp = cmp;
@@ -334,24 +362,25 @@ short SKIPLIST_NAME(insert)(SL_LIST *list, SL_KEY key, SL_VAL val, SL_VAL *prior
 
     i = list->highest;
     while (i --> 0) {
-        while (n->next[i] && list->cmp(key, n->next[i]->key, list->cmp_udata) > 0)
+        while (n->next[i] && CMP_LT(list, n->next[i]->key, key))
             n = n->next[i];
         update[i] = n;
     }
+    n = n->next[0];
 
-    replaced = n->next[0] != NULL && list->cmp(key, n->next[0]->key, list->cmp_udata) == 0;
+    replaced = n != NULL && CMP_EQ(list, key, n->key);
     if (replaced) {
         if (prior)
-            *prior = n->next[0]->val;
-        n->next[0]->val = val;
+            *prior = n->val;
+        n->val = val;
         SKIPLIST_FREE(list->mem_udata, nn);
     }
     else {
-        while (nn->height > list->highest)
+        i = nn->height;
+        while (nn->height >= list->highest)
             update[list->highest++] = list->head;
 
-        i = nn->height;
-        while (i --> 0) {
+        for (i = 0; i <= nn->height; i++) {
             nn->next[i] = update[i]->next[i];
             update[i]->next[i] = nn;
         }
@@ -365,26 +394,23 @@ short SKIPLIST_NAME(insert)(SL_LIST *list, SL_KEY key, SL_VAL val, SL_VAL *prior
 SKIPLIST_EXTERN
 short SKIPLIST_NAME(find)(SL_LIST *list, SL_KEY key, SL_VAL *out) {
     SL_NODE *n;
-    int cmp;
     unsigned int i;
     n = list->head;
     i = list->highest;
 
     while (i --> 0) {
-        while (n->next[i]) {
-            if ((cmp = list->cmp(key, n->next[i]->key, list->cmp_udata)) == 0)
-                goto found;
-            else if (cmp < 0)
-                break;
+        while (n->next[i] && CMP_LT(list, n->next[i]->key, key)) {
             n = n->next[i];
         }
     }
-    return 0;
+    n = n->next[0];
 
-    found:
-    if (out)
-        *out = n->next[i]->val;
-    return 1;
+    if (n && CMP_EQ(list, key, n->key)) {
+        if (out)
+            *out = n->val;
+        return 1;
+    }
+    return 0;
 }
 
 SKIPLIST_EXTERN
@@ -485,13 +511,14 @@ short SKIPLIST_NAME(pop)(SL_LIST *list, SL_KEY *key_out, SL_VAL *val_out) {
         return 0;
 
     first = list->head->next[0];
-    i = first->height + 1;
-    while (i --> 0) {
-        if (list->head->next[i])
+    i = first->height;
+    do {
+        if (first->next[i])
             list->head->next[i] = first->next[i];
         else
+            list->head->next[i] = NULL;
             --list->highest;
-    }
+    } while (i --> 0);
 
     if (key_out)
         *key_out = first->key;
@@ -523,6 +550,9 @@ short SKIPLIST_NAME(shift)(SL_LIST *list, SL_KEY *key_out, SL_VAL *val_out) {
     --list->size;
     return 1;
 }
+
+#undef CMP_EQ
+#undef CMP_LT
 
 #endif
 
