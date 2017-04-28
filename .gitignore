@@ -1,0 +1,4 @@
+*.core
+*.o
+.DS_Store
+/test_skiplist
