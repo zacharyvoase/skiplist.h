@@ -425,7 +425,6 @@ SKIPLIST_EXTERN
 short SKIPLIST_NAME(remove)(SL_LIST *list, SL_KEY key, SL_VAL *out) {
     SL_NODE *n;
     SL_NODE *update[SKIPLIST_MAX_LEVELS];
-    int cmp;
     unsigned int i;
 
     if (list->size == 0) {
