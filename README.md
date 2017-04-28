@@ -7,7 +7,7 @@ Single-header-file, public domain, type-generic C89 skip list implementation.
 Implements a sorted dictionary or set with a skiplist. Duplicate elements (i.e.
 a sorted linked list) are not currently supported.
 
-1. Download [skiplist.h](https://raw.githubusercontent.com/alpha123/skiplist.h/master/skiplist.h).
+1. Download [skiplist.h](https://raw.githubusercontent.com/zacharyvoase/skiplist.h/master/skiplist.h).
    That's the only file you need.
 2. Create a guarded header that defines SKIPLIST_KEY and SKIPLIST_VALUE
    and includes skiplist.h. Optionally define SKIPLIST_NAMESPACE.
@@ -16,7 +16,7 @@ a sorted linked list) are not currently supported.
 3. Repeat for any different key/value pair types you need. Be sure to
    define different SKIPLIST_NAMESPACE values and define SKIPLIST_IMPLEMENTATION
    once for each key/value type pair.
- 
+
 Other options:
 
  - SKIPLIST_MAX_LEVELS - 33 by default.
@@ -65,6 +65,7 @@ Example Usage
 #endif
 
 /* program.c */
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 /* You should only define this once. If it helps,
@@ -85,19 +86,15 @@ int iter(const char *key, int val, void *userdata) {
 int main(int argc, const char **argv) {
     sl_strint_skiplist list;
     int err = sl_strint_init(&list, cmp, NULL, NULL);
-    // Not real error handling
-    if (err) {
-        puts("Uh oh");
-        exit(err);
-    }
-    
+    assert(err == 0);
+
     sl_strint_insert(&list, "a", 1, NULL);
     sl_strint_insert(&list, "c", 3, NULL);
     sl_strint_insert(&list, "b", 2, NULL);
-    
+
     short has_b = sl_strint_find(&list, "b", NULL),  // => 1
           has_d = sl_strint_find(&list, "d", NULL);  // => 0
-    
+
     int a_val;
     short exists = sl_strint_find(&list, "a", &a_val);
     if (exists)
@@ -107,7 +104,7 @@ int main(int argc, const char **argv) {
 
     int default_val = 10;
     int d_val = sl_strint_get(&list, "d", default_val);  // => 10
-    
+
     sl_strint_iter(&list, iter, NULL);
     // Prints a = 1, b = 2, c = 3
 
@@ -117,16 +114,34 @@ int main(int argc, const char **argv) {
         print("b used to be %d, but now it is no more\n", b_val);
     else
         puts("b was only an illusion, a fleeting glimpse of a dream");
-    
+
     sl_strint_free(&list);
     return 0;
 }
 ```
 
-License
--------
-       
-Where possible, this software has been disclaimed from any copyright
-and is placed in the public domain. Where that dedication is not
-recognized, you are granted a perpetual, irrevocable license to copy
-and modify this file in any way you see fit.
+
+Unlicense
+---------
+
+This is free and unencumbered software released into the public domain.
+
+Anyone is free to copy, modify, publish, use, compile, sell, or distribute this
+software, either in source code form or as a compiled binary, for any purpose,
+commercial or non-commercial, and by any means.
+
+In jurisdictions that recognize copyright laws, the author or authors of this
+software dedicate any and all copyright interest in the software to the public
+domain. We make this dedication for the benefit of the public at large and to
+the detriment of our heirs and successors. We intend this dedication to be an
+overt act of relinquishment in perpetuity of all present and future rights to
+this software under copyright law.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+For more information, please refer to <http://unlicense.org/>
