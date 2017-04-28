@@ -9,7 +9,7 @@ int int_cmp(int a, int b, void *_udata) {
     return a - b;
 }
 
-#define SETUP sl_skiplist sl; sl_init(&sl, int_cmp, NULL, NULL, NULL);
+#define SETUP sl_skiplist sl; sl_init(&sl, int_cmp, NULL, NULL);
 #define TEARDOWN sl_free(&sl);
 
 #define TEST(name) void test_ ## name(void) { SETUP

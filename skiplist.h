@@ -15,8 +15,6 @@
  *      - SKIPLIST_MAX_LEVELS - 33 by default
  *      - SKIPLIST_MALLOC & SKIPLIST_FREE - wrappers for stdlib malloc/free by default
  *        Both are passed a void * data pointer (for memory pool, gc context, etc).
- *      - SKIPLIST_RAND & SKIPLIST_SRAND - wrappers around stdlib rand/srand.
- *        Both are passed a void * pointer for a random context.
  *      - SKIPLIST_STATIC - if defined, declare all public functions static
  *        (make skiplist local to the file it's included from).
  *      - SKIPLIST_EXTERN - 'extern' by default; define to change calling convention
@@ -28,7 +26,7 @@
  *     // Include this file wherever you need a string -> int skiplist
  *     #ifndef SKIPLIST_STR_INT_H
  *     #define SKIPLIST_STR_INT_H
- *     
+ *
  *     #define SKIPLIST_KEY const char *
  *     #define SKIPLIST_VALUE int
  *     #define SKIPLIST_NAMESPACE sl_strint_
@@ -60,14 +58,14 @@
  *             puts("Uh oh");
  *             exit(err);
  *         }
- *         
+ *
  *         sl_strint_insert(&list, "a", 1, NULL);
  *         sl_strint_insert(&list, "c", 3, NULL);
  *         sl_strint_insert(&list, "b", 2, NULL);
- *         
+ *
  *         short has_b = sl_strint_find(&list, "b", NULL),  // => 1
  *               has_d = sl_strint_find(&list, "d", NULL);  // => 0
- *         
+ *
  *         int a_val;
  *         short exists = sl_strint_find(&list, "a", &a_val);
  *         if (exists)
@@ -77,7 +75,7 @@
  *
  *         int default_val = 10;
  *         int d_val = sl_strint_get(&list, "d", default_val);  // => 10
- *         
+ *
  *         sl_strint_iter(&list, iter, NULL);
  *         // Prints a = 1, b = 2, c = 3
  *
@@ -87,7 +85,7 @@
  *             print("b used to be %d, but now it is no more\n", b_val);
  *         else
  *             puts("b was only an illusion, a fleeting glimpse of a dream");
- *         
+ *
  *         sl_strint_free(&list);
  *         return 0;
  *     }
@@ -99,6 +97,13 @@
 #endif
 #define SKIPLIST_MALLOC(udata, sz) malloc((sz))
 #define SKIPLIST_FREE(udata, ptr) free((ptr))
+#endif
+
+#ifndef SKIPLIST_HEIGHT
+#ifdef SKIPLIST_IMPLEMENTATION
+#include <stdlib.h>
+#endif
+#define SKIPLIST_HEIGHT(key) (unsigned int)arc4random_uniform(SKIPLIST_MAX_LEVELS);
 #endif
 
 #if !defined(SKIPLIST_KEY) || !defined(SKIPLIST_VALUE)
@@ -131,19 +136,6 @@ this file. See the comments at the top for usage instructions.
 #define SL_KEY SKIPLIST_KEY
 #define SL_VAL SKIPLIST_VALUE
 
-#ifndef SKIPLIST_RAND
-#include <stdlib.h>
-#include <time.h>
-void SKIPLIST_NAME(_stdsrand)(void *_userdata);
-#ifdef SKIPLIST_IMPLEMENTATION
-void SKIPLIST_NAME(_stdsrand)(void *_userdata) {
-    time_t t;
-    srand((unsigned)time(&t));
-}
-#endif
-#define SKIPLIST_RAND(udata) rand()
-#define SKIPLIST_SRAND(udata) SKIPLIST_NAME(_stdsrand)(udata)
-#endif
 
 typedef int (* SL_CMP_FN)(SL_KEY, SL_KEY, void *);
 typedef int (* SL_ITER_FN)(SL_KEY, SL_VAL, void *);
@@ -162,7 +154,6 @@ typedef struct {
     SL_CMP_FN cmp;
     void *cmp_udata;
     void *mem_udata;
-    void *rand_udata;
     SKIPLIST_NAME(node) *head;
 } SL_LIST;
 
@@ -173,14 +164,11 @@ typedef struct {
  * @mem_udata Opaque pointer to pass to the SKIPLIST_MALLOC and
  *            SKIPLIST_FREE macros. Unused by default, but custom
   *           memory allocators may use it.
- * @rand_udata Opaque pointer to pass to the SKIPLIST_RAND and
- *             SKIPLIST_SRAND macros. Unused by default, but custom
- *             RNGs may use it.
  *
  * @return 0 if successful and nonzero if something failed
  */
 SKIPLIST_EXTERN
-int SKIPLIST_NAME(init)(SL_LIST *list, SL_CMP_FN cmp, void *cmp_udata, void *mem_udata, void *rand_udata);
+int SKIPLIST_NAME(init)(SL_LIST *list, SL_CMP_FN cmp, void *cmp_udata, void *mem_udata);
 
 /* Free memory used by a skiplist.
  * @list Free this guy from his bondage to memory.
@@ -307,12 +295,10 @@ short SKIPLIST_NAME(shift)(SL_LIST *list, SL_KEY *key_out, SL_VAL *val_out);
 #ifdef SKIPLIST_IMPLEMENTATION
 
 SKIPLIST_EXTERN
-int SKIPLIST_NAME(init)(SL_LIST *list, SL_CMP_FN cmp, void *cmp_udata, void *mem_udata, void *rand_udata) {
+int SKIPLIST_NAME(init)(SL_LIST *list, SL_CMP_FN cmp, void *cmp_udata, void *mem_udata) {
     list->cmp = cmp;
     list->cmp_udata = cmp_udata;
     list->mem_udata = mem_udata;
-    list->rand_udata = rand_udata;
-    SKIPLIST_SRAND(rand_udata);
     list->highest = 0;
     list->size = 0;
     list->head = (SL_NODE *)SKIPLIST_MALLOC(mem_udata, sizeof(SL_NODE));
@@ -335,7 +321,6 @@ void SKIPLIST_NAME(free)(SL_LIST *list) {
 SKIPLIST_EXTERN
 short SKIPLIST_NAME(insert)(SL_LIST *list, SL_KEY key, SL_VAL val, SL_VAL *prior) {
     SL_NODE *n, *nn, *update[SKIPLIST_MAX_LEVELS];
-    int r;
     unsigned int i;
     short replaced;
 
@@ -345,12 +330,7 @@ short SKIPLIST_NAME(insert)(SL_LIST *list, SL_KEY key, SL_VAL val, SL_VAL *prior
     nn->val = val;
     memset(nn->next, 0, SKIPLIST_MAX_LEVELS * sizeof(SL_NODE *));
 
-    for (r = 0, i = 0; !(r & 1); ++i) {
-        if (r == 0)
-            r = SKIPLIST_RAND(list->rand_udata);
-        r >>= 1;
-    }
-    nn->height = i;
+    nn->height = SKIPLIST_HEIGHT(key);
 
     i = list->highest;
     while (i --> 0) {

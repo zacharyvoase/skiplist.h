@@ -22,8 +22,10 @@ Other options:
  - SKIPLIST_MAX_LEVELS - 33 by default.
  - SKIPLIST_MALLOC & SKIPLIST_FREE - wrappers for stdlib malloc/free by default.
    Both are passed a void \* data pointer (for memory pool, gc context, etc).
- - SKIPLIST_RAND & SKIPLIST_SRAND - wrappers around stdlib rand/srand.
-   Both are passed a void \* pointer for a random context.
+ - SKIPLIST_HEIGHT - a macro function taking `(SKIPLIST_KEY)` which should
+   produce an unsigned int 0 <= height < SKIPLIST_MAX_LEVELS. By default this
+   is implemented using `arc4random_uniform` in the C standard library, but you
+   might want to replace it with a key-dependent function.
  - SKIPLIST_STATIC - if defined, declare all public functions static
    (make skiplist local to the file it's included from).
  - SKIPLIST_EXTERN - 'extern' by default; define to change calling convention
@@ -31,7 +33,7 @@ Other options:
 
 skiplist.h has no dependencies. By default it uses some functions from the C
 standard library, but that dependency can be replaced by defining the
-SKIPLIST_MALLOC, SKIPLIST_FREE, SKIPLIST_RAND, and SKIPLIST_SRAND macros.
+SKIPLIST_MALLOC, SKIPLIST_FREE, and SKIPLIST_HEIGHT macros.
 
 Tests
 -----
@@ -82,7 +84,7 @@ int iter(const char *key, int val, void *userdata) {
 
 int main(int argc, const char **argv) {
     sl_strint_skiplist list;
-    int err = sl_strint_init(&list, cmp, NULL);
+    int err = sl_strint_init(&list, cmp, NULL, NULL);
     // Not real error handling
     if (err) {
         puts("Uh oh");
