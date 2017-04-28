@@ -427,19 +427,23 @@ short SKIPLIST_NAME(remove)(SL_LIST *list, SL_KEY key, SL_VAL *out) {
     SL_NODE *update[SKIPLIST_MAX_LEVELS];
     int cmp;
     unsigned int i;
-    n = list->head;
-    i = list->highest;
 
-    while (i --> 0) {
-        while (n->next[i] && (cmp = list->cmp(n->next[i]->key, key, list->cmp_udata)) < 0) {
+    if (list->size == 0) {
+        return 0;
+    }
+
+    n = list->head;
+    i = list->highest - 1;
+    do {
+        while (n->next[i] && CMP_LT(list, n->next[i]->key, key)) {
             n = n->next[i];
         }
         update[i] = n;
-    }
+    } while (i --> 0);
 
     n = n->next[0];
-    if (n && (list->cmp(n->key, key, list->cmp_udata) == 0) && out) {
-      *out = n->val;
+    if (n && CMP_EQ(list, n->key, key)) {
+      if (out) *out = n->val;
       i = 0;
       while (i < list->highest) {
         if (update[i]->next[i] != n) break;
@@ -513,11 +517,9 @@ short SKIPLIST_NAME(pop)(SL_LIST *list, SL_KEY *key_out, SL_VAL *val_out) {
     first = list->head->next[0];
     i = first->height;
     do {
-        if (first->next[i])
-            list->head->next[i] = first->next[i];
-        else
-            list->head->next[i] = NULL;
-            --list->highest;
+        if (first->next[i] == NULL)
+            list->highest--;
+        list->head->next[i] = first->next[i];
     } while (i --> 0);
 
     if (key_out)
