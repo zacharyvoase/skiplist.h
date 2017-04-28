@@ -3,6 +3,7 @@
 #define SKIPLIST_KEY int
 #define SKIPLIST_VALUE int
 #define SKIPLIST_IMPLEMENTATION
+#define SKIPLIST_MAX_LEVELS 5
 #include "../skiplist.h"
 
 int int_cmp(int a, int b, void *_udata) {
