@@ -14,12 +14,6 @@ test: $(TEST_OUT)
 	./$(TEST_OUT)
 
 
-DOC_DEFS=-DSKIPLIST_KEY='void *' -DSKIPLIST_VALUE='void *'
-
-.PHONY: doc
-doc:
-	cldoc generate $(DOC_DEFS) -- --output doc/ $(SL_HEADER)
-
 $(TEST_OUT): $(OBJS)
 	$(CC) $(LDFLAGS) $(OBJS) -o $@
 
