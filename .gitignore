@@ -1,4 +1,7 @@
 *.core
 *.o
+*.profraw
+*.profdata
 .DS_Store
 /test_skiplist
+/skiplist.coverage.html
